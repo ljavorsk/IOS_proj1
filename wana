@@ -19,12 +19,12 @@ error() {
 # Listing hostnames from ip-adr
 # If ip-adr dont have hostname, echo ip-adr
 listHosts() {
-	while read i; do
-				ip_add=$(echo "$i" | cut -d' ' -f1)
-				converted=$(host $ip_add)
+	while read line; do
+				ip_add=$(echo "$line" | cut -d' ' -f1)
+				converted=$(host "$ip_add")
 				if [ $? -eq 1 ]
 				then
-					echo $ip_add
+					echo $ip_add 
 				else
 					echo $converted | rev | cut -d' ' -f1 | rev
 				fi
@@ -50,14 +50,46 @@ getDateTime(){
 
 }
 
+dateConvert(){
+
+	echo "$1" | tr '\/' ' ' | sed ' s/:/ /1' |
+				sed ' s/Jan/01/g' |
+				sed ' s/Feb/02/g' |
+				sed ' s/Mar/03/g' |
+				sed ' s/Apr/04/g' |
+				sed ' s/May/05/g' |
+				sed ' s/Jun/06/g' |
+				sed ' s/Jul/07/g' |
+				sed ' s/Aug/08/g' |
+				sed ' s/Sep/09/g' |
+				sed ' s/Oct/10/g' |
+				sed ' s/Nov/11/g' |
+				sed ' s/Dec/12/g' |
+				awk ' { print $3 "-" $1 "-" $2 " " $4 } '
+}
+
+afterThisTime(){
+
+	while read line; do
+				if [ "$line" -gt "$2" ]
+				then
+					echo "$line"
+				fi
+			done <"$1"
+}
+
 # Applying the filters on logs
 filters (){
 	while [ $filters_count -gt 0 ]; do
 		if [ "$after_datetime" ]
 		then
 			times=$(getDateTime "$1")
-			epoch_times=$(echo "$times" | awk '{ date -d $0 +"%s" }')
-			echo "$epoch_times"
+			converted_times=$(dateConvert "$times")
+			afterThisTime "$converted_times" "$after_datetime"
+			
+			#echo "$times"
+			#epoch_times=$(echo "$times" | awk '{ date -d $0 +"%s" }')
+			#echo "$epoch_times"
 			#TODO
 
 		elif [ "$before_datetime" ]
@@ -165,12 +197,12 @@ while [ $# -gt 0 ]; do
 		
 		if [ $list_ip ]
 		then
-			cat "$1" | awk ' { print $1} '
+			cat "$1" | awk ' { print $1} ' | sort | uniq
 		fi
 
 		if [ $list_hosts ]
 		then
-			listHosts $1
+			listHosts "$1" | sort | uniq
 		fi
 
 		if [ $list_uri ]
