@@ -70,12 +70,20 @@ dateConvert(){
 
 afterThisTime(){
 
-	while read line; do
-				if [ "$line" -gt "$2" ]
-				then
-					echo "$line"
-				fi
-			done <"$1"
+	input=$(echo "$1" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+	comparator=$(echo "$2" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+	
+	for line in $input
+	do
+		#date=$(echo "$line" | sed ' s/-/ /3' )
+		
+		if [ $line -gt "$comparator" ]
+		then
+			#echo $2
+			echo $line
+		fi
+	done
+
 }
 
 # Applying the filters on logs
