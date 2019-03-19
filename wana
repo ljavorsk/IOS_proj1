@@ -33,7 +33,7 @@ listHosts() {
 
 # Checks if the date is correctly inserted
 datetimeCheck(){
-	correct=$(echo "$1" | awk '/^[1-2][0-9]{3}-[0-3][0-9]-[0-2][0-9]\ [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/')
+	correct=$(echo "$1" | awk '/^[1-2][0-9]{3}-[0-1][0-9]-[0-3][0-9]\ [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/')
 	if [ -n "$correct" ]
 		then
 			return
@@ -46,8 +46,8 @@ datetimeCheck(){
 # Separates only the time from input
 getDateTime(){
 
-	cut -d '[' -f2 "$1" | cut -d ']' -f1 | cut -d ' ' -f1
-
+	echo "$1" | awk ' { print $4 } ' | sed ' s/\[//g '
+	
 }
 
 dateConvert(){
@@ -65,7 +65,7 @@ dateConvert(){
 				sed ' s/Oct/10/g' |
 				sed ' s/Nov/11/g' |
 				sed ' s/Dec/12/g' |
-				awk ' { print $3 "-" $1 "-" $2 " " $4 } '
+				awk ' { print $3 "-" $2 "-" $1 " " $4 } '
 }
 
 afterThisTime(){
@@ -73,13 +73,11 @@ afterThisTime(){
 	input=$(echo "$1" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
 	comparator=$(echo "$2" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
 	
+	# Echo only dates that are after the comparator date
 	for line in $input
 	do
-		#date=$(echo "$line" | sed ' s/-/ /3' )
-		
 		if [ $line -gt "$comparator" ]
 		then
-			#echo $2
 			echo $line
 		fi
 	done
@@ -96,14 +94,7 @@ filters (){
 	while [ $filters_count -gt 0 ]; do
 		if [ "$after_datetime" ]
 		then
-			times=$(getDateTime "$1")
-			converted_times=$(dateConvert "$times")
-			afterThisTime "$converted_times" "$after_datetime"
-			
-			#echo "$times"
-			#epoch_times=$(echo "$times" | awk '{ date -d $0 +"%s" }')
-			#echo "$epoch_times"
-			#TODO
+			afterThisTime "$(dateConvert "$(getDateTime "$(cat "$1")")")" "$after_datetime"
 
 		elif [ "$before_datetime" ]
 		then 
@@ -198,6 +189,11 @@ esac
 # Processing the logs and print the final result
 while [ $# -gt 0 ]; do
 	
+	if [ "$(echo "$1" | grep .gz)" ]
+	then
+		gzip -dc "$1" | cat 
+	fi
+
 	if [ -f "$1" ]
 	then 
 
@@ -206,8 +202,9 @@ while [ $# -gt 0 ]; do
 			cat "$1"
 			exit 0
 		fi 
+
+		# Filtring the log with all filters
 		filtered=$(filters "$1")
-		#echo "$filtered"
 		
 		if [ $list_ip ]
 		then
@@ -224,6 +221,30 @@ while [ $# -gt 0 ]; do
 		then
 			echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | uniq
 		fi
+
+		if [ $hist_ip ]
+		then
+			echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
+			awk ' {
+				printf $2 " " "("$1"):" " "  
+				for (i = 0; i < $1; i++)
+					printf "#" 
+				printf "\n"
+			} ' 
+		fi
+
+		if [ $hist_load ]
+		then
+			dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
+			awk ' { print $1 " " $2":00" } ' | uniq -c | 
+			awk ' {
+				printf $2 " " $3 " " "("$1"):" " "  
+				for (i = 0; i < $1; i++)
+					printf "#" 
+				printf "\n"
+			} '
+		fi
+
 		shift 1
 	else
 		error invalid_input
