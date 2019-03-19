@@ -11,10 +11,61 @@ error() {
 		invalid_date)
 			echo "Invalid date, format: \"YYYY-MM-DD HH:MM:SS\"" >&2;;
 		invalid_input)
-			echo "Invalid input" >&2;;
+			echo "Invalid input file" >&2;;
 
 	esac
 }
+
+finalForm(){
+
+	if [ "$filters_count" -eq 0 ] && [ ! "$hist_load" ] &&  [ ! "$hist_ip" ] && [ ! "$list_uri" ] && [ ! "$list_hosts" ] && [ ! "$list_ip" ]
+		then
+			echo "$1"
+			exit 0
+		fi 
+
+		# Filtring the log with all filters
+		filtered=$(filters "$1")
+		
+		if [ $list_ip ]
+		then
+			echo "$filtered" | awk ' { print $1} ' | sort | uniq
+
+		elif [ $list_hosts ]
+		then
+			adresses=$(echo "$filtered" | awk ' { print $1} ' | sort | uniq )
+			listHosts "$adresses"
+
+		elif [ $list_uri ]
+		then
+			echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | sort | uniq
+
+		elif [ $hist_ip ]
+		then
+			echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
+			awk ' {
+				printf $2 " " "("$1"):" " "  
+				for (i = 0; i < $1; i++)
+					printf "#" 
+				printf "\n"
+			} ' 
+
+		elif [ $hist_load ]
+		then
+			dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
+			awk ' { print $1 " " $2":00" } ' | uniq -c | 
+			awk ' {
+				printf $2 " " $3 " " "("$1"):" " "  
+				for (i = 0; i < $1; i++)
+					printf "#" 
+				printf "\n"
+			} '
+
+		else
+			echo "$filtered"
+		fi
+}
+
 
 # Listing hostnames from ip-adr
 # If ip-adr dont have hostname, echo ip-adr
@@ -24,9 +75,9 @@ listHosts() {
 		converted=$(host "$line")
 	 	if [ $? -eq 1 ]
 		then
-	 		echo $line 
+	 		echo "$line" 
 	 	else
-	 		echo $converted | rev | cut -d' ' -f1 | rev
+	 		echo "$converted" | rev | cut -d' ' -f1 | rev
 	 	fi
 	done
 }
@@ -76,9 +127,9 @@ afterThisTime(){
 	# Echo only dates that are after the comparator date
 	for line in $input
 	do
-		if [ $line -gt "$comparator" ]
+		if [ "$line" -gt "$comparator" ]
 		then
-			echo $line
+			echo "$line"
 		fi
 	done
 
@@ -88,23 +139,24 @@ afterThisTime(){
 filters (){
 	if [ $filters_count -eq 0 ]
 	then
-		cat "$1"
+		echo "$1"
 	fi
 
 	while [ $filters_count -gt 0 ]; do
 		if [ "$after_datetime" ]
 		then
-			afterThisTime "$(dateConvert "$(getDateTime "$(cat "$1")")")" "$after_datetime"
+			afterThisTime "$(dateConvert "$(getDateTime "$(echo "$1")")")" "$after_datetime"
 
 		elif [ "$before_datetime" ]
 		then 
 			echo "b"
 		elif [ "$ip_arg" ]
 		then
-			echo "ip"
+			
+			echo "$1" | grep "$ip_arg"
 		elif [ "$uri_arg" ]
 		then
-			echo "uri"
+			echo "$1" | grep "$uri_arg"
 		fi
 		filters_count=$((filters_count-1))
 		shift
@@ -113,6 +165,9 @@ filters (){
 
 }
 
+#####################################################################################
+##################################   MAIN   #########################################
+#####################################################################################
 
 # Checks for all filters
 while [ $# -gt 0 ]; do
@@ -180,74 +235,30 @@ case $1 in
 		;;
 esac
 
-#if [ $# -eq 0 ]
-#then
-#	read -r
-	
-#fi
+if [ $# -eq 0 ]
+then
+	read -r 
+	#TODO ulozit do premennej, potom v tom while dole to
+	#kontrolovat ci nie je prazdna, a spracovat tu v dalsom elife
+fi
 
 # Processing the logs and print the final result
 while [ $# -gt 0 ]; do
 	
 	if [ "$(echo "$1" | grep .gz)" ]
 	then
-		gzip -dc "$1" | cat 
-	fi
-
-	if [ -f "$1" ]
-	then 
-
-		if [ "$filters_count" -eq 0 ] && [ ! "$hist_load" ] &&  [ ! "$hist_ip" ] && [ ! "$list_uri" ] && [ ! "$list_hosts" ] && [ ! "$list_ip" ]
-		then
-			cat "$1"
-			exit 0
-		fi 
-
-		# Filtring the log with all filters
-		filtered=$(filters "$1")
-		
-		if [ $list_ip ]
-		then
-			echo "$filtered" | awk ' { print $1} ' | sort | uniq
-		fi
-
-		if [ $list_hosts ]
-		then
-			adresses=$(echo "$filtered" | awk ' { print $1} ' | sort | uniq )
-			listHosts "$adresses"
-		fi
-
-		if [ $list_uri ]
-		then
-			echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | uniq
-		fi
-
-		if [ $hist_ip ]
-		then
-			echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
-			awk ' {
-				printf $2 " " "("$1"):" " "  
-				for (i = 0; i < $1; i++)
-					printf "#" 
-				printf "\n"
-			} ' 
-		fi
-
-		if [ $hist_load ]
-		then
-			dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
-			awk ' { print $1 " " $2":00" } ' | uniq -c | 
-			awk ' {
-				printf $2 " " $3 " " "("$1"):" " "  
-				for (i = 0; i < $1; i++)
-					printf "#" 
-				printf "\n"
-			} '
-		fi
-
+		finalForm "$(gzip -dc "$1" | cat)"
 		shift 1
+
+	elif [ -f "$1" ]
+	then 
+		finalForm "$(cat "$1")"
+		shift 1
+
 	else
 		error invalid_input
 		exit 1
 	fi
+	exit 0
+
 done
