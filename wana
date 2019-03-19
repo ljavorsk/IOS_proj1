@@ -19,16 +19,16 @@ error() {
 # Listing hostnames from ip-adr
 # If ip-adr dont have hostname, echo ip-adr
 listHosts() {
-	while read line; do
-				ip_add=$(echo "$line" | cut -d' ' -f1)
-				converted=$(host "$ip_add")
-				if [ $? -eq 1 ]
-				then
-					echo $ip_add 
-				else
-					echo $converted | rev | cut -d' ' -f1 | rev
-				fi
-			done <$1
+	for line in $1
+	do
+		converted=$(host "$line")
+	 	if [ $? -eq 1 ]
+		then
+	 		echo $line 
+	 	else
+	 		echo $converted | rev | cut -d' ' -f1 | rev
+	 	fi
+	done
 }
 
 # Checks if the date is correctly inserted
@@ -88,6 +88,11 @@ afterThisTime(){
 
 # Applying the filters on logs
 filters (){
+	if [ $filters_count -eq 0 ]
+	then
+		cat "$1"
+	fi
+
 	while [ $filters_count -gt 0 ]; do
 		if [ "$after_datetime" ]
 		then
@@ -114,6 +119,7 @@ filters (){
 		shift
 
 	done
+
 }
 
 
@@ -201,21 +207,22 @@ while [ $# -gt 0 ]; do
 			exit 0
 		fi 
 		filtered=$(filters "$1")
-		echo "$filtered"
+		#echo "$filtered"
 		
 		if [ $list_ip ]
 		then
-			cat "$1" | awk ' { print $1} ' | sort | uniq
+			echo "$filtered" | awk ' { print $1} ' | sort | uniq
 		fi
 
 		if [ $list_hosts ]
 		then
-			listHosts "$1" | sort | uniq
+			adresses=$(echo "$filtered" | awk ' { print $1} ' | sort | uniq )
+			listHosts "$adresses"
 		fi
 
 		if [ $list_uri ]
 		then
-			cat "$1" | cut -d'"' -f2 | cut -d' ' -f2
+			echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | uniq
 		fi
 		shift 1
 	else
