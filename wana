@@ -123,15 +123,15 @@ filters (){
 		cat
 	fi
 	
-	input="$(cat)"
 	while [ $filters_count -gt 0 ]; do
 
 		if [ "$after_datetime" ]
 		then
-
 			comparator=$(echo "$after_datetime" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
-			for line in "$input"
+			for line in "$(cat)"
 			do
+				echo "$line"
+				echo "############"
 				one_time="$(dateConvert "$(getDateTime "$line")")" 
 				epoch=$(echo "$one_time" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
 					# if [ "$epoch" -gt "$comparator" ]
@@ -158,6 +158,7 @@ filters (){
 
 }
 
+# Reads all the logs 
 logsRead(){
 	if [ $# -eq 0 ]
 	then
@@ -260,10 +261,9 @@ then
 	logsRead "$@"
 	exit 0
 fi 
-
 # Filtring the log with all filters
-filtered=$(logsRead "$@" | filters)
-		
+
+filtered=$( logsRead "$@" | filters)
 if [ "$list_ip" ]
 then
 	echo "$filtered" | awk ' { print $1} ' | sort | uniq
@@ -300,3 +300,5 @@ then
 else
 	echo "$filtered"
 fi
+
+exit 0
