@@ -1,7 +1,6 @@
 #!/bin/sh
 
 POSIXLY_CORRECT=yes
-filters_count=0
 
 # Error function
 error() {
@@ -14,6 +13,8 @@ error() {
 			echo "Invalid input file" >&2;;
 		invalid_ip)
 			echo "Invalid ip adress" >&2;;
+		too_many_filters)
+			echo "You can apply only one filter of his type"
 	esac
 	exit 1
 }
@@ -46,9 +47,8 @@ ipCheck(){
 		([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|								\
 		1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|						\
 		1{0,1}[0-9]){0,1}[0-9]))$/||  											\
-		/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|						\
-		2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]               	    \
-		|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/			
+		/^((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|	\
+		1{0,1}[0-9]){0,1}[0-9])$/												\
 	')
 	if [ -n "$correct" ]; then
 			return
@@ -101,32 +101,25 @@ correctDatesParsing(){
 
 # Applying the filters on logs and cats them on stdout
 filters (){
-	if [ $filters_count -eq 0 ]; then
+	if [ ! $filter_applied ]; then
 		cat
+		return
 	fi
 
-	while [ $filters_count -gt 0 ]; do
+	logs_input="$(cat)"
 
-		if [ "$after_datetime" ] || [ "$before_datetime" ]; then
-			if [ "$after_datetime" ] && [ "$before_datetime" ]; then
-				shift 1
-				filters_count=$((filters_count-1))
-			fi
+	if [ "$after_datetime" ] || [ "$before_datetime" ]; then
+		# Separates the times you want
+		logs_input=$(echo "$logs_input" | correctDatesParsing "$after_datetime" "$before_datetime" "$logs_input" )
+	fi
+	if [ "$ip_arg" ]; then
+		logs_input=$(echo "$logs_input" | grep -w "$ip_arg")
+	fi
+	if [ "$uri_arg" ]; then
+		logs_input=$(echo "$logs_input" | grep "$uri_arg")
+	fi
 
-			# Separates the times you want
-			cat | correctDatesParsing "$after_datetime" "$before_datetime"
-			shift 1
-		elif [ "$ip_arg" ]; then
-			cat | grep -w "$ip_arg"
-			shift 1
-		elif [ "$uri_arg" ]; then
-			cat | grep "$uri_arg"
-			shift 1
-		fi
-
-		filters_count=$((filters_count-1))
-
-	done
+	echo "$logs_input"
 }
 
 # Listing hostnames from ip-adr
@@ -144,9 +137,7 @@ listHosts() {
 
 # Reads all the logs and concatenates them 
 logsRead(){
-	if [ $# -eq 0 ]; then
-		cat
-	fi
+	if [ $# -eq 0 ]; then cat; fi
 	# Processing the logs and cats them on stdin
 	while [ $# -gt 0 ]; do
 		
@@ -164,7 +155,6 @@ logsRead(){
 	done
 }
 
-
 #####################################################################################
 ##################################   MAIN   #########################################
 #####################################################################################
@@ -173,32 +163,35 @@ logsRead(){
 while [ $# -gt 0 ]; do
 	case $1 in
 		-a )
+			if [ "$after_datetime" ]; then error too_many_filters; fi
 			datetimeCheck "$2"
 			after_datetime=$2
 			shift 2
-			filters_count=$((filters_count+1))
+			filter_applied=true
 			;;
 
 		-b )
+			if [ "$before_datetime" ]; then error too_many_filters; fi
 			datetimeCheck "$2"
 			before_datetime=$2
 			shift 2
-			filters_count=$((filters_count+1))
+			filter_applied=true
 			;;
 
 		-ip )
+			if [ "$ip_arg" ]; then error too_many_filters; fi
 			ipCheck "$2"
 			ip_arg=$2
 			shift 2
-			filters_count=$((filters_count+1))
+			filter_applied=true
 			;;
 
 		-uri )
+			if [ "$uri_arg" ]; then error too_many_filters; fi
 			uri_arg=$2
 			shift 2
-			filters_count=$((filters_count+1))
+			filter_applied=true
 			;;
-
 		*)
 			break
 			;;
@@ -236,16 +229,14 @@ case $1 in
 		;;
 esac
 
-if [ "$filters_count" -eq 0 ] && [ ! "$cmd_name" ]; then
+if [ ! "$filter_applied" ] && [ ! "$cmd_name" ]; then
 	logsRead "$@"
 	exit 0
 fi 
 # Filtring the log with all filters
 filtered=$( logsRead "$@" | filters)
 
-if [ ! "$filtered" ]; then
-	exit 0
-fi
+if [ ! "$filtered" ]; then exit 0; fi
 
 if [ "$cmd_name" = "list-ip" ]; then
 	echo "$filtered" | awk ' { print $1} ' | sort | uniq
