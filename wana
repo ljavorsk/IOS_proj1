@@ -22,8 +22,7 @@ error() {
 # Checks if the date is correctly inserted
 datetimeCheck(){
 	correct=$(echo "$1" | awk '/^[1-2][0-9]{3}-[0-1][0-9]-[0-3][0-9]\ [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/')
-	if [ -n "$correct" ]
-		then
+	if [ -n "$correct" ]; then
 			return
 		else
 			error invalid_date
@@ -31,10 +30,17 @@ datetimeCheck(){
 }
 
 ipCheck(){
+	# Regex for IPv4 and IPv6 addresses
 	correct=$(echo "$1" | 
-	awk '/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/ ')
-	if [ -n "$correct" ]
-		then
+	awk ' /(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|    \
+	([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|                       \
+	([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|                       \
+	[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}| \
+	::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|   \
+	([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/||  \
+	/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]                   \
+	|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/')
+	if [ -n "$correct" ]; then
 			return
 		else
 			error invalid_ip
@@ -47,8 +53,7 @@ listHosts() {
 	for line in $1
 	do
 		converted=$(host "$line")
-	 	if [ $? -eq 1 ]
-		then
+	 	if [ $? -eq 1 ]; then
 	 		echo "$line" 
 	 	else
 	 		echo "$converted" | rev | cut -d' ' -f1 | rev
@@ -92,8 +97,7 @@ afterThisTime(){
 	for line in "$1"
 	do
 		input=$(echo "$line" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
-		if [ "$input" -gt "$comparator" ]
-		then
+		if [ "$input" -gt "$comparator" ]; then
 			echo "$line"
 		fi
 	done
@@ -108,8 +112,7 @@ beforeThisTime(){
 	
 	for line in $input
 	do
-		if [ "$line" -lt "$comparator" ]
-		then
+		if [ "$line" -lt "$comparator" ]; then
 			echo "$line"
 		fi
 	done
@@ -118,17 +121,15 @@ beforeThisTime(){
 
 # Applying the filters on logs
 filters (){
-	if [ $filters_count -eq 0 ]
-	then
+	if [ $filters_count -eq 0 ]; then
 		cat
 	fi
 	
 	while [ $filters_count -gt 0 ]; do
 
-		if [ "$after_datetime" ]
-		then
+		if [ "$after_datetime" ]; then
 			comparator=$(echo "$after_datetime" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
-			for line in "$(cat)"
+			for line in $(cat)
 			do
 				echo "$line"
 				echo "############"
@@ -140,15 +141,12 @@ filters (){
 					# fi
 			done
 
-		elif [ "$before_datetime" ]
-		then 
+		elif [ "$before_datetime" ]; then 
 			beforeThisTime "$(dateConvert "$(getDateTime "$(cat)")")" "$before_datetime"
-		elif [ "$ip_arg" ]
-		then
+		elif [ "$ip_arg" ]; then
 			
-			cat | grep "$ip_arg"
-		elif [ "$uri_arg" ]
-		then
+			cat | grep -w "$ip_arg"
+		elif [ "$uri_arg" ]; then
 			cat | grep "$uri_arg"
 		fi
 		filters_count=$((filters_count-1))
@@ -160,20 +158,17 @@ filters (){
 
 # Reads all the logs 
 logsRead(){
-	if [ $# -eq 0 ]
-	then
+	if [ $# -eq 0 ]; then
 		cat
 	fi
 	# Processing the logs and print the final result
 	while [ $# -gt 0 ]; do
 		
-		if [ "$(echo "$1" | grep .gz)" ]
-		then
+		if [ "$(echo "$1" | grep .gz)" ]; then
 			gzip -dc "$1"
 			shift 1
 
-		elif [ -f "$1" ]
-		then 
+		elif [ -f "$1" ]; then 
 			cat "$1"
 			shift 1
 		else
@@ -206,7 +201,7 @@ while [ $# -gt 0 ]; do
 			;;
 
 		-ip )
-			#ipCheck "$2"
+			ipCheck "$2"
 			ip_arg=$2
 			shift 2
 			filters_count=$((filters_count+1))
@@ -256,29 +251,28 @@ case $1 in
 esac
 
 
-if [ "$filters_count" -eq 0 ] && [ ! "$hist_load" ] &&  [ ! "$hist_ip" ] && [ ! "$list_uri" ] && [ ! "$list_hosts" ] && [ ! "$list_ip" ]
-then
+if [ "$filters_count" -eq 0 ] && [ ! "$hist_load" ] &&  [ ! "$hist_ip" ] && [ ! "$list_uri" ] && [ ! "$list_hosts" ] && [ ! "$list_ip" ]; then
 	logsRead "$@"
 	exit 0
 fi 
 # Filtring the log with all filters
 
 filtered=$( logsRead "$@" | filters)
-if [ "$list_ip" ]
-then
+if [ ! "$filtered" ]; then
+	exit 0
+fi
+
+if [ "$list_ip" ]; then
 	echo "$filtered" | awk ' { print $1} ' | sort | uniq
 
-elif [ "$list_hosts" ]
-then
+elif [ "$list_hosts" ]; then
 	adresses=$(echo "$filtered" | awk ' { print $1} ' | sort | uniq )
 	listHosts "$adresses"
 
-elif [ "$list_uri" ]
-then
+elif [ "$list_uri" ]; then
 	echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | sort | uniq
 
-elif [ "$hist_ip" ]
-then
+elif [ "$hist_ip" ]; then
 	echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
 	awk ' {
 		printf $2 " " "("$1"):" " "  
@@ -287,8 +281,7 @@ then
 		printf "\n"
 		} ' 
 
-elif [ "$hist_load" ]
-then
+elif [ "$hist_load" ]; then
 	dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
 	awk ' { print $1 " " $2":00" } ' | sort -n -k 1.4 -k 1.7 -k 1 | uniq -c |
 	awk ' {
