@@ -12,60 +12,34 @@ error() {
 			echo "Invalid date, format: \"YYYY-MM-DD HH:MM:SS\"" >&2;;
 		invalid_input)
 			echo "Invalid input file" >&2;;
+		invalid_ip)
+			echo "Invalid ip adress" >&2;;
 
 	esac
+	exit 1
 }
 
-finalForm(){
-
-	if [ "$filters_count" -eq 0 ] && [ ! "$hist_load" ] &&  [ ! "$hist_ip" ] && [ ! "$list_uri" ] && [ ! "$list_hosts" ] && [ ! "$list_ip" ]
+# Checks if the date is correctly inserted
+datetimeCheck(){
+	correct=$(echo "$1" | awk '/^[1-2][0-9]{3}-[0-1][0-9]-[0-3][0-9]\ [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/')
+	if [ -n "$correct" ]
 		then
-			echo "$1"
-			exit 0
-		fi 
-
-		# Filtring the log with all filters
-		filtered=$(filters "$1")
-		
-		if [ $list_ip ]
-		then
-			echo "$filtered" | awk ' { print $1} ' | sort | uniq
-
-		elif [ $list_hosts ]
-		then
-			adresses=$(echo "$filtered" | awk ' { print $1} ' | sort | uniq )
-			listHosts "$adresses"
-
-		elif [ $list_uri ]
-		then
-			echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | sort | uniq
-
-		elif [ $hist_ip ]
-		then
-			echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
-			awk ' {
-				printf $2 " " "("$1"):" " "  
-				for (i = 0; i < $1; i++)
-					printf "#" 
-				printf "\n"
-			} ' 
-
-		elif [ $hist_load ]
-		then
-			dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
-			awk ' { print $1 " " $2":00" } ' | uniq -c | 
-			awk ' {
-				printf $2 " " $3 " " "("$1"):" " "  
-				for (i = 0; i < $1; i++)
-					printf "#" 
-				printf "\n"
-			} '
-
+			return
 		else
-			echo "$filtered"
+			error invalid_date
 		fi
 }
 
+ipCheck(){
+	correct=$(echo "$1" | 
+	awk '/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/ ')
+	if [ -n "$correct" ]
+		then
+			return
+		else
+			error invalid_ip
+		fi	
+}
 
 # Listing hostnames from ip-adr
 # If ip-adr dont have hostname, echo ip-adr
@@ -82,18 +56,6 @@ listHosts() {
 	done
 }
 
-# Checks if the date is correctly inserted
-datetimeCheck(){
-	correct=$(echo "$1" | awk '/^[1-2][0-9]{3}-[0-1][0-9]-[0-3][0-9]\ [0-2][0-9]:[0-5][0-9]:[0-5][0-9]$/')
-	if [ -n "$correct" ]
-		then
-			return
-		else
-			error invalid_date
-			exit 1
-		fi
-}
-
 # Separates only the time from input
 getDateTime(){
 
@@ -101,33 +63,52 @@ getDateTime(){
 	
 }
 
+# Converts the months from alphabet form to number form
 dateConvert(){
 
-	echo "$1" | tr '\/' ' ' | sed ' s/:/ /1' |
-				sed ' s/Jan/01/g' |
-				sed ' s/Feb/02/g' |
-				sed ' s/Mar/03/g' |
-				sed ' s/Apr/04/g' |
-				sed ' s/May/05/g' |
-				sed ' s/Jun/06/g' |
-				sed ' s/Jul/07/g' |
-				sed ' s/Aug/08/g' |
-				sed ' s/Sep/09/g' |
-				sed ' s/Oct/10/g' |
-				sed ' s/Nov/11/g' |
-				sed ' s/Dec/12/g' |
-				awk ' { print $3 "-" $2 "-" $1 " " $4 } '
+	 
+	echo "$1" | awk ' /^[0-9]/ ' | tr '\/' ' ' | sed ' s/:/ /1' |
+	 			sed ' s/Jan/01/g' |
+	 			sed ' s/Feb/02/g' |
+	 			sed ' s/Mar/03/g' |
+	 			sed ' s/Apr/04/g' |
+	 			sed ' s/May/05/g' |
+	 			sed ' s/Jun/06/g' |
+	 			sed ' s/Jul/07/g' |
+	 			sed ' s/Aug/08/g' |
+	 			sed ' s/Sep/09/g' |
+	 			sed ' s/Oct/10/g' |
+	 			sed ' s/Nov/11/g' |
+	 			sed ' s/Dec/12/g' |
+	 			awk ' { print $3 "-" $2 "-" $1 " " $4 } '
 }
 
+# Echo only dates that are after the comparator date
 afterThisTime(){
+
+	echo "$1"
+	comparator=$(echo "$2" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+	
+	for line in "$1"
+	do
+		input=$(echo "$line" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+		if [ "$input" -gt "$comparator" ]
+		then
+			echo "$line"
+		fi
+	done
+
+}
+
+# Echo only dates that are before the comparator date
+beforeThisTime(){
 
 	input=$(echo "$1" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
 	comparator=$(echo "$2" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
 	
-	# Echo only dates that are after the comparator date
 	for line in $input
 	do
-		if [ "$line" -gt "$comparator" ]
+		if [ "$line" -lt "$comparator" ]
 		then
 			echo "$line"
 		fi
@@ -139,31 +120,68 @@ afterThisTime(){
 filters (){
 	if [ $filters_count -eq 0 ]
 	then
-		echo "$1"
+		cat
 	fi
-
+	
+	input="$(cat)"
 	while [ $filters_count -gt 0 ]; do
+
 		if [ "$after_datetime" ]
 		then
-			afterThisTime "$(dateConvert "$(getDateTime "$(echo "$1")")")" "$after_datetime"
+
+			comparator=$(echo "$after_datetime" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+			for line in "$input"
+			do
+				one_time="$(dateConvert "$(getDateTime "$line")")" 
+				epoch=$(echo "$one_time" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+					# if [ "$epoch" -gt "$comparator" ]
+					# then
+					# 	echo "$line"
+					# fi
+			done
 
 		elif [ "$before_datetime" ]
 		then 
-			echo "b"
+			beforeThisTime "$(dateConvert "$(getDateTime "$(cat)")")" "$before_datetime"
 		elif [ "$ip_arg" ]
 		then
 			
-			echo "$1" | grep "$ip_arg"
+			cat | grep "$ip_arg"
 		elif [ "$uri_arg" ]
 		then
-			echo "$1" | grep "$uri_arg"
+			cat | grep "$uri_arg"
 		fi
 		filters_count=$((filters_count-1))
-		shift
+		shift 1
 
 	done
 
 }
+
+logsRead(){
+	if [ $# -eq 0 ]
+	then
+		cat
+	fi
+	# Processing the logs and print the final result
+	while [ $# -gt 0 ]; do
+		
+		if [ "$(echo "$1" | grep .gz)" ]
+		then
+			gzip -dc "$1"
+			shift 1
+
+		elif [ -f "$1" ]
+		then 
+			cat "$1"
+			shift 1
+		else
+			error invalid_input
+		fi
+
+	done
+}
+
 
 #####################################################################################
 ##################################   MAIN   #########################################
@@ -174,19 +192,20 @@ while [ $# -gt 0 ]; do
 	case $1 in
 		-a )
 			datetimeCheck "$2"
-			after_datetime="$2"
+			after_datetime=$2
 			filters_count=$((filters_count+1))
 			shift 2
 			;;
 
 		-b )
 			datetimeCheck "$2"
-			before_datetime="$2"
+			before_datetime=$2
 			shift 2
 			filters_count=$((filters_count+1))
 			;;
 
 		-ip )
+			#ipCheck "$2"
 			ip_arg=$2
 			shift 2
 			filters_count=$((filters_count+1))
@@ -235,30 +254,49 @@ case $1 in
 		;;
 esac
 
-if [ $# -eq 0 ]
+
+if [ "$filters_count" -eq 0 ] && [ ! "$hist_load" ] &&  [ ! "$hist_ip" ] && [ ! "$list_uri" ] && [ ! "$list_hosts" ] && [ ! "$list_ip" ]
 then
-	read -r 
-	#TODO ulozit do premennej, potom v tom while dole to
-	#kontrolovat ci nie je prazdna, a spracovat tu v dalsom elife
-fi
-
-# Processing the logs and print the final result
-while [ $# -gt 0 ]; do
-	
-	if [ "$(echo "$1" | grep .gz)" ]
-	then
-		finalForm "$(gzip -dc "$1" | cat)"
-		shift 1
-
-	elif [ -f "$1" ]
-	then 
-		finalForm "$(cat "$1")"
-		shift 1
-
-	else
-		error invalid_input
-		exit 1
-	fi
+	logsRead "$@"
 	exit 0
+fi 
 
-done
+# Filtring the log with all filters
+filtered=$(logsRead "$@" | filters)
+		
+if [ "$list_ip" ]
+then
+	echo "$filtered" | awk ' { print $1} ' | sort | uniq
+
+elif [ "$list_hosts" ]
+then
+	adresses=$(echo "$filtered" | awk ' { print $1} ' | sort | uniq )
+	listHosts "$adresses"
+
+elif [ "$list_uri" ]
+then
+	echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | sort | uniq
+
+elif [ "$hist_ip" ]
+then
+	echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
+	awk ' {
+		printf $2 " " "("$1"):" " "  
+		for (i = 0; i < $1; i++)
+			printf "#" 
+		printf "\n"
+		} ' 
+
+elif [ "$hist_load" ]
+then
+	dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
+	awk ' { print $1 " " $2":00" } ' | sort -n -k 1.4 -k 1.7 -k 1 | uniq -c |
+	awk ' {
+		printf $2 " " $3 " " "("$1"):" " "  
+		for (i = 0; i < $1; i++)
+			printf "#" 
+		printf "\n"}' 
+
+else
+	echo "$filtered"
+fi
