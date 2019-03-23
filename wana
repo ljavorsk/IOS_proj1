@@ -1,5 +1,21 @@
 #!/bin/sh
 
+#**********************************************************************#
+# Project           : Web analyzator
+#
+# Program name      : wana
+#
+# Author            : Lukas Javorsky (xjavor20)
+#
+# Date created      : 20190316
+#
+# Purpose           : Analyze the web logs and printing the logs that
+#					  we want to filter, and possibly only the part of them					  
+#
+# Subject			: IOS (Operating Systems)
+#
+#**********************************************************************#
+
 POSIXLY_CORRECT=yes
 
 # Error function
@@ -14,7 +30,7 @@ error() {
 		invalid_ip)
 			echo "Invalid ip adress" >&2;;
 		too_many_filters)
-			echo "You can apply only one filter of his type"
+			echo "You can apply only one filter of its type"
 	esac
 	exit 1
 }
@@ -29,6 +45,7 @@ datetimeCheck(){
 		fi
 }
 
+# Checks if the IP address is in the correct form (IPv4 or IPv6)
 ipCheck(){
 	# Regex for IPv4 and IPv6 addresses
 	correct=$(echo "$1" | 
@@ -64,10 +81,11 @@ getDateTime(){
 	
 }
 
-# Converts the months from alphabet form to number form
+# Converts the months from alphabet form to number form, 
+# and in correct order
 dateConvert(){
 
-	echo "$1" | awk ' /^[0-9]/ ' | tr '\/' ' ' | sed ' s/:/ /1' |
+	echo "$1" | tr '\/' ' ' | sed ' s/:/ /1' |
 	 			sed ' s/Jan/01/g' |
 	 			sed ' s/Feb/02/g' |
 	 			sed ' s/Mar/03/g' |
@@ -85,9 +103,10 @@ dateConvert(){
 
 # Prints only the lines with datetime after/before we want
 correctDatesParsing(){
+	after=$(echo "$1" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+	before=$(echo "$2" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
+	
 	while read -r line; do
-		after=$(echo "$1" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
-		before=$(echo "$2" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')
 		line_date="$(dateConvert "$(getDateTime "$line")" | sed ' s/\-//g' | sed ' s/://g' | sed ' s/ //g')"
 		
 		if { { [ "$after" ] && [ "$line_date" -gt "$after" ] ;} &&                   \
@@ -99,7 +118,7 @@ correctDatesParsing(){
 	done
 }
 
-# Applying the filters on logs and cats them on stdout
+# Applying the filters on logs and concatenates them on stdout
 filters (){
 	if [ ! $filter_applied ]; then
 		cat
@@ -122,7 +141,7 @@ filters (){
 	echo "$logs_input"
 }
 
-# Listing hostnames from ip-adr
+# Listing hostnames from ip-adr.
 # If ip-adr dont have hostname, echo ip-adr
 listHosts() {
 	for line in $1; do
@@ -135,7 +154,7 @@ listHosts() {
 	done
 }
 
-# Reads all the logs and concatenates them 
+# Reads all the logs and concatenates them together
 logsRead(){
 	if [ $# -eq 0 ]; then cat; fi
 	# Processing the logs and cats them on stdin
@@ -159,7 +178,7 @@ logsRead(){
 ##################################   MAIN   #########################################
 #####################################################################################
 
-# Checks for all filters
+# Checks for all filters and theirs arguments
 while [ $# -gt 0 ]; do
 	case $1 in
 		-a )
@@ -198,7 +217,7 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-# Checks for command and store it to cmd_name
+# Checks for command and stores it to cmd_name
 case $1 in
 	list-ip)
 		cmd_name=$1
@@ -229,6 +248,7 @@ case $1 in
 		;;
 esac
 
+# If no filter is applied and also no command, just prints the logs
 if [ ! "$filter_applied" ] && [ ! "$cmd_name" ]; then
 	logsRead "$@"
 	exit 0
