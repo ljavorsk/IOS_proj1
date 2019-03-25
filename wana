@@ -266,13 +266,13 @@ elif [ "$cmd_name" = "list-uri" ]; then
 	echo "$filtered" | cut -d'"' -f2 | cut -d' ' -f2 | awk ' /^\// ' | sort | uniq
 
 elif [ "$cmd_name" = "hist-ip" ]; then
-	echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r |
+	echo "$filtered" | awk ' { print $1} ' | sort | uniq -c | sort -r -g |
 	awk ' {
 		printf $2 " " "("$1"):" " "  
 		for (i = 0; i < $1; i++)
 			printf "#" 
 		printf "\n"
-		} ' 
+		} '
 
 elif [ "$cmd_name" = "hist-load" ]; then
 	dateConvert "$(getDateTime "$filtered")" | sed ' s/:/ /1' |
