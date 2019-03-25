@@ -21,8 +21,6 @@ POSIXLY_CORRECT=yes
 # Error function
 error() {
 	case $1 in
-		correct_form)
-			echo "Usage: ./wana [FILTER] [COMMAND] [LOG1[LOG2[...]]" >&2;;
 		invalid_date)
 			echo "Invalid date, format: \"YYYY-MM-DD HH:MM:SS\"" >&2;;
 		invalid_input)
@@ -134,7 +132,7 @@ filters (){
 		logs_input=$(echo "$logs_input" | grep -w "$ip_arg")
 	fi
 	if [ "$uri_arg" ]; then
-		logs_input=$(echo "$logs_input" | grep "$uri_arg")
+		logs_input=$(echo "$logs_input" | grep -E "(OPTIONS|GET|HEAD|POST|PUT|DELETE|TRACE|CONNECT) $uri_arg")
 	fi
 
 	echo "$logs_input"
