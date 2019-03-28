@@ -78,7 +78,7 @@ getDateTime(){
 	
 }
 
-# Converts the months from alphabet form to number form, 
+# Converts the months from alphabet form to numeric form, 
 # and in correct order
 dateConvert(){
 
@@ -161,7 +161,7 @@ logsRead(){
 			gzip -dc "$1"
 			shift 1
 
-		elif [ -f "$1" ]; then 
+		elif [ -r "$1" ]; then 
 			cat "$1"
 			shift 1
 		else
@@ -175,7 +175,7 @@ logsRead(){
 ##################################   MAIN   #########################################
 #####################################################################################
 
-# Checks for all filters and theirs arguments
+# Checks for all filters and stores theirs arguments
 while [ $# -gt 0 ]; do
 	case $1 in
 		-a )
